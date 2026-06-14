@@ -83,6 +83,32 @@ func TestParseTimePos_NotJSON(t *testing.T) {
 	}
 }
 
+// Positive: progress is reported on every reportEveryTicks-th poll tick.
+func TestShouldReport_OnInterval(t *testing.T) {
+	for _, ticks := range []int{reportEveryTicks, 2 * reportEveryTicks, 3 * reportEveryTicks} {
+		if !shouldReport(ticks) {
+			t.Errorf("shouldReport(%d) = false, want true (multiple of %d)", ticks, reportEveryTicks)
+		}
+	}
+}
+
+// Negative: progress is not reported on the ticks in between, so reports stay
+// throttled to one per reportEveryTicks seconds instead of one per second.
+func TestShouldReport_BetweenIntervals(t *testing.T) {
+	for _, ticks := range []int{1, 5, reportEveryTicks - 1, reportEveryTicks + 1} {
+		if shouldReport(ticks) {
+			t.Errorf("shouldReport(%d) = true, want false (not a multiple of %d)", ticks, reportEveryTicks)
+		}
+	}
+}
+
+// Sanity: the throttle resolves to a 10-second report interval (poll runs at 1s).
+func TestReportEveryTicks_Is10s(t *testing.T) {
+	if reportEveryTicks != 10 {
+		t.Errorf("reportEveryTicks = %d, want 10 (poll is 1s → 10s reports)", reportEveryTicks)
+	}
+}
+
 // Positive: Stop kills the running process so the TUI exit closes the stream.
 func TestStop_KillsProcess(t *testing.T) {
 	p := New("/tmp/sock")

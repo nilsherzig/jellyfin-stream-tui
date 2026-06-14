@@ -152,6 +152,17 @@ func (p *Player) Stop() {
 	}
 }
 
+// reportEveryTicks throttles progress reports to the server. poll queries mpv
+// every second (to keep the final position accurate and notice mpv exiting),
+// but only forwards a report every reportEveryTicks ticks → one per 10 seconds.
+const reportEveryTicks = 10
+
+// shouldReport reports whether the given poll tick count should emit a progress
+// report. ticks counts only successful position reads (buffering ticks skipped).
+func shouldReport(ticks int) bool {
+	return ticks%reportEveryTicks == 0
+}
+
 // poll connects to the mpv socket and queries time-pos + pause once per second.
 func (p *Player) poll(stop <-chan struct{}, tr *tracker, onProgress func(Status)) {
 	conn := p.dialWithRetry(stop)
@@ -164,6 +175,7 @@ func (p *Player) poll(stop <-chan struct{}, tr *tracker, onProgress func(Status)
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
+	ticks := 0
 	for {
 		select {
 		case <-stop:
@@ -180,8 +192,9 @@ func (p *Player) poll(stop <-chan struct{}, tr *tracker, onProgress func(Status)
 			if json.Unmarshal(resp.Data, &pos) != nil {
 				continue
 			}
-			tr.set(pos)
-			if onProgress != nil {
+			tr.set(pos) // track every second so the final position is accurate
+			ticks++
+			if onProgress != nil && shouldReport(ticks) {
 				onProgress(Status{Position: pos, Paused: queryPaused(conn, reader)})
 			}
 		}
