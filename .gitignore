@@ -1,0 +1,10 @@
+# Holds credentials – never check in.
+config.yaml
+
+# Build artifacts
+/jellyfin-stream-tui
+/config.example.yaml
+
+# Nix build symlink
+/result
+/result-*
