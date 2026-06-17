@@ -129,6 +129,33 @@ func (c *Client) StreamURL(itemID string) string {
 	return fmt.Sprintf("%s/Videos/%s/stream?static=true&api_key=%s", c.baseURL, itemID, url.QueryEscape(c.token))
 }
 
+// GetPlaybackInfo fetches live playback media info for an item, including
+// available media sources and their streams (video, audio, subtitles).
+func (c *Client) GetPlaybackInfo(itemID string) (*PlaybackInfoResponse, error) {
+	resp, err := c.do(http.MethodGet, fmt.Sprintf("/Items/%s/PlaybackInfo?userId=%s", itemID, c.userID), nil)
+	if err != nil {
+		return nil, fmt.Errorf("playback info request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("playback info: HTTP %d", resp.StatusCode)
+	}
+
+	var info PlaybackInfoResponse
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return nil, fmt.Errorf("parse playback info: %w", err)
+	}
+	return &info, nil
+}
+
+// SubtitleURL builds a URL to download a specific subtitle stream in the given
+// format (e.g. "srt", "vtt", "ass").
+func (c *Client) SubtitleURL(itemID, mediaSourceID string, index int, format string) string {
+	return fmt.Sprintf("%s/Videos/%s/%s/Subtitles/%d/Stream.%s?api_key=%s",
+		c.baseURL, itemID, mediaSourceID, index, format, url.QueryEscape(c.token))
+}
+
 // postReport sends a playback report to Jellyfin.
 func (c *Client) postReport(path string, body map[string]any) error {
 	payload, _ := json.Marshal(body)

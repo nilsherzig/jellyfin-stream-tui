@@ -132,6 +132,78 @@ func TestStreamURL(t *testing.T) {
 	}
 }
 
+// Positive: SubtitleURL builds the correct path with item, media source, index,
+// format, and api_key.
+func TestSubtitleURL(t *testing.T) {
+	c := New("https://jf.example.com", "dev1")
+	c.token = "tok"
+	got := c.SubtitleURL("item1", "ms42", 3, "srt")
+	wantPrefix := "https://jf.example.com/Videos/item1/ms42/Subtitles/3/Stream.srt?api_key=tok"
+	if got != wantPrefix {
+		t.Fatalf("SubtitleURL = %q, want %q", got, wantPrefix)
+	}
+}
+
+// Positive: GetPlaybackInfo fetches and parses the PlaybackInfo response.
+func TestGetPlaybackInfo_Success(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/Items/item1/PlaybackInfo" {
+			t.Errorf("wrong path: %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("userId") != "u1" {
+			t.Errorf("wrong userId: %s", r.URL.Query().Get("userId"))
+		}
+		json.NewEncoder(w).Encode(PlaybackInfoResponse{
+			PlaySessionID: "ps1",
+			MediaSources: []MediaSourceInfo{
+				{
+					ID:   "ms1",
+					Name: "Default",
+					MediaStreams: []MediaStream{
+						{Index: 0, Type: "Video", Codec: "h264"},
+						{Index: 1, Type: "Audio", Codec: "aac", Language: "eng"},
+						{Index: 2, Type: "Subtitle", Codec: "srt", Language: "eng", IsDefault: true, DisplayTitle: "English"},
+						{Index: 3, Type: "Subtitle", Codec: "srt", Language: "fre", DisplayTitle: "French"},
+					},
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := New(srv.URL, "dev1")
+	c.userID = "u1"
+	info, err := c.GetPlaybackInfo("item1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(info.MediaSources) != 1 {
+		t.Fatalf("expected 1 media source, got %d", len(info.MediaSources))
+	}
+	if len(info.MediaSources[0].MediaStreams) != 4 {
+		t.Fatalf("expected 4 streams, got %d", len(info.MediaSources[0].MediaStreams))
+	}
+	// Verify subtitle stream.
+	sub := info.MediaSources[0].MediaStreams[2]
+	if sub.Type != "Subtitle" || sub.Language != "eng" || !sub.IsDefault {
+		t.Fatalf("wrong subtitle stream: %+v", sub)
+	}
+}
+
+// Negative: GetPlaybackInfo on server error returns an error.
+func TestGetPlaybackInfo_ServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	c := New(srv.URL, "dev1")
+	c.userID = "u1"
+	if _, err := c.GetPlaybackInfo("item1"); err == nil {
+		t.Fatal("expected error for HTTP 500, got nil")
+	}
+}
+
 // Positive: ReportProgress posts ItemId, PositionTicks and IsPaused correctly.
 func TestReportProgress(t *testing.T) {
 	var gotBody map[string]any

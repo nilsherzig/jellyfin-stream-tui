@@ -20,7 +20,7 @@ func hasArg(args []string, want string) bool {
 // Positive: mpvArgs contains the socket, no-terminal, and the URL.
 func TestMpvArgs_Basic(t *testing.T) {
 	p := New("/tmp/sock")
-	args := p.mpvArgs("http://stream", 0)
+	args := p.mpvArgs("http://stream", 0, nil)
 
 	if !hasArg(args, "--input-ipc-server=/tmp/sock") {
 		t.Errorf("missing IPC socket: %v", args)
@@ -43,7 +43,7 @@ func TestMpvArgs_Basic(t *testing.T) {
 func TestMpvArgs_ExtraFromEnv(t *testing.T) {
 	t.Setenv("JFTUI_MPV_ARGS", "--vo=null --no-video")
 	p := New("/tmp/sock")
-	args := p.mpvArgs("http://stream", 0)
+	args := p.mpvArgs("http://stream", 0, nil)
 	if !hasArg(args, "--vo=null") || !hasArg(args, "--no-video") {
 		t.Errorf("missing extra flags: %v", args)
 	}
@@ -52,9 +52,24 @@ func TestMpvArgs_ExtraFromEnv(t *testing.T) {
 // Positive: a resume position sets --start.
 func TestMpvArgs_Resume(t *testing.T) {
 	p := New("/tmp/sock")
-	args := p.mpvArgs("http://stream", 42.7)
+	args := p.mpvArgs("http://stream", 42.7, nil)
 	if !hasArg(args, "--start=42") {
 		t.Errorf("expected --start=42, got: %v", args)
+	}
+}
+
+// Positive: subtitle files are passed as --sub-file arguments.
+func TestMpvArgs_Subtitles(t *testing.T) {
+	p := New("/tmp/sock")
+	args := p.mpvArgs("http://stream", 0, []string{"https://jf/sub/1.srt", "https://jf/sub/2.srt"})
+	if !hasArg(args, "--sub-file=https://jf/sub/1.srt") {
+		t.Errorf("missing first sub-file: %v", args)
+	}
+	if !hasArg(args, "--sub-file=https://jf/sub/2.srt") {
+		t.Errorf("missing second sub-file: %v", args)
+	}
+	if !hasArg(args, "--sid=1") {
+		t.Errorf("missing --sid=1 (subs enabled by default): %v", args)
 	}
 }
 

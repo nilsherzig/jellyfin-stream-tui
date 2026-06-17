@@ -33,15 +33,19 @@ func New(socketPath string) *Player {
 }
 
 // mpvArgs builds the mpv command line.
-func (p *Player) mpvArgs(streamURL string, startSeconds float64) []string {
+func (p *Player) mpvArgs(streamURL string, startSeconds float64, subtitleFiles []string) []string {
 	args := []string{
 		"--input-ipc-server=" + p.socketPath,
 		"--no-terminal",      // mpv must not touch the terminal (the TUI owns it)
 		"--force-window=yes", // always show a window, even while buffering
+		"--sid=1",            // enable subtitles by default
 	}
 	if startSeconds > 0 {
 		// mpv expects seconds; whole seconds are enough for resume.
 		args = append(args, fmt.Sprintf("--start=%d", int(startSeconds)))
+	}
+	for _, sf := range subtitleFiles {
+		args = append(args, "--sub-file="+sf)
 	}
 	// Optional extra mpv flags from the environment (e.g. subtitles, audio, or
 	// headless flags for testing). Whitespace-separated, later = higher priority.
@@ -115,11 +119,12 @@ func (t *tracker) get() float64  { t.mu.Lock(); defer t.mu.Unlock(); return t.po
 // Play starts mpv and blocks until playback ends.
 // It calls onProgress periodically while playing.
 // It returns the last known position (for the final Stopped report).
-func (p *Player) Play(streamURL string, startSeconds float64, onProgress func(Status)) (float64, error) {
+// subtitleFiles, if non-empty, are passed as --sub-file to mpv (URLs or local files).
+func (p *Player) Play(streamURL string, startSeconds float64, subtitleFiles []string, onProgress func(Status)) (float64, error) {
 	// Remove a stale socket so the dial reconnects cleanly.
 	_ = os.Remove(p.socketPath)
 
-	cmd := exec.Command(p.mpvPath, p.mpvArgs(streamURL, startSeconds)...)
+	cmd := exec.Command(p.mpvPath, p.mpvArgs(streamURL, startSeconds, subtitleFiles)...)
 	if err := cmd.Start(); err != nil {
 		return 0, fmt.Errorf("start mpv: %w", err)
 	}

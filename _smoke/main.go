@@ -18,10 +18,14 @@ import (
 )
 
 func main() {
-	// Config path from JFTUI_CONFIG, otherwise config.yaml.
+	// Config path from JFTUI_CONFIG, otherwise $HOME/.config/jellyfin-stream-tui/config.yaml.
 	cfgPath := os.Getenv("JFTUI_CONFIG")
 	if cfgPath == "" {
-		cfgPath = "config.yaml"
+		home, err := os.UserHomeDir()
+		if err != nil {
+			panic(fmt.Errorf("cannot determine home directory: %w", err))
+		}
+		cfgPath = filepath.Join(home, ".config", "jellyfin-stream-tui", "config.yaml")
 	}
 	cfg, err := config.Load(cfgPath)
 	if err != nil {

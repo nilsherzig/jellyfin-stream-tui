@@ -46,6 +46,33 @@ func (it Item) DisplayName() string {
 	return fmt.Sprintf("%s → %s%s", it.SeriesName, se, it.Name)
 }
 
+// MediaStream describes a single stream (video, audio, subtitle, …) inside a
+// media source. Only the fields we need are modelled.
+type MediaStream struct {
+	Index      int    `json:"Index"`
+	Type       string `json:"Type"`       // Video, Audio, Subtitle, …
+	Codec      string `json:"Codec"`
+	Language   string `json:"Language"`
+	DisplayTitle string `json:"DisplayTitle"`
+	IsDefault  bool   `json:"IsDefault"`
+	IsForced   bool   `json:"IsForced"`
+	IsExternal bool   `json:"IsExternal"`
+	DeliveryUrl string `json:"DeliveryUrl"`
+}
+
+// MediaSourceInfo holds one media source (e.g. one file version).
+type MediaSourceInfo struct {
+	ID           string        `json:"Id"`
+	Name         string        `json:"Name"`
+	MediaStreams []MediaStream `json:"MediaStreams"`
+}
+
+// PlaybackInfoResponse mirrors the response from /Items/{itemId}/PlaybackInfo.
+type PlaybackInfoResponse struct {
+	MediaSources  []MediaSourceInfo `json:"MediaSources"`
+	PlaySessionID string            `json:"PlaySessionId"`
+}
+
 // itemsResponse mirrors the Jellyfin API list responses.
 type itemsResponse struct {
 	Items            []Item `json:"Items"`
