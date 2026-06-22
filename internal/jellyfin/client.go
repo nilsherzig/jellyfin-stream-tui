@@ -124,6 +124,15 @@ func (c *Client) Resume() ([]Item, error) {
 	return c.listItems(fmt.Sprintf("/Users/%s/Items/Resume?%s", c.userID, q.Encode()))
 }
 
+// NextUp returns the next episode for shows that have been started (the
+// "Next Up" section on the Jellyfin home screen).
+func (c *Client) NextUp() ([]Item, error) {
+	q := url.Values{}
+	q.Set("Fields", "UserData,RunTimeTicks")
+	q.Set("Limit", "12")
+	return c.listItems(fmt.Sprintf("/Shows/NextUp?%s", q.Encode()))
+}
+
 // StreamURL builds the direct stream URL that mpv can play.
 func (c *Client) StreamURL(itemID string) string {
 	return fmt.Sprintf("%s/Videos/%s/stream?static=true&api_key=%s", c.baseURL, itemID, url.QueryEscape(c.token))

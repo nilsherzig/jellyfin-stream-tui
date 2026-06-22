@@ -18,6 +18,7 @@ type fakeBackend struct {
 
 func (f *fakeBackend) Views() ([]jellyfin.Item, error)  { return f.children, f.err }
 func (f *fakeBackend) Resume() ([]jellyfin.Item, error) { return nil, nil }
+func (f *fakeBackend) NextUp() ([]jellyfin.Item, error) { return nil, nil }
 func (f *fakeBackend) Children(parentID string) ([]jellyfin.Item, error) {
 	f.gotPaPID = parentID
 	return f.children, f.err
@@ -137,6 +138,26 @@ func TestView_NoResumeSection(t *testing.T) {
 	out := m.View()
 	if strings.Contains(out, "Continue Watching") {
 		t.Fatalf("did not expect a 'Continue Watching' header:\n%s", out)
+	}
+	if strings.Contains(out, "Next Up") {
+		t.Fatalf("did not expect a 'Next Up' header:\n%s", out)
+	}
+}
+
+// Positive: with nextUpCount>0 the View shows the "Next Up" section.
+func TestView_NextUpSection(t *testing.T) {
+	items := []jellyfin.Item{
+		{ID: "1", Name: "Movie A", Type: "Movie"},
+		{ID: "2", Name: "Movie B", Type: "Movie"},
+		{ID: "3", Name: "Next Ep", Type: "Episode"},
+		{ID: "4", Name: "Folder X", IsFolder: true},
+	}
+	m := newTestModel(items)
+	m.cur.resumeCount = 2
+	m.cur.nextUpCount = 1 // third item is Next Up, the rest are libraries
+	out := m.View()
+	if !strings.Contains(out, "Continue Watching") || !strings.Contains(out, "Next Up") || !strings.Contains(out, "Libraries") {
+		t.Fatalf("missing section headers:\n%s", out)
 	}
 }
 

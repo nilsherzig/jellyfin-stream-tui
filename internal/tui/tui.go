@@ -14,6 +14,7 @@ type Backend interface {
 	Views() ([]jellyfin.Item, error)
 	Children(parentID string) ([]jellyfin.Item, error)
 	Resume() ([]jellyfin.Item, error)
+	NextUp() ([]jellyfin.Item, error)
 }
 
 // PlayFunc plays an item and returns a tea.Cmd that emits a PlayDoneMsg when
@@ -27,8 +28,9 @@ type level struct {
 	items    []jellyfin.Item
 	cursor   int
 	// resumeCount counts the leading "Continue Watching" items (home page only).
-	// The remaining items are the libraries.
 	resumeCount int
+	// nextUpCount counts the "Next Up" items after Continue Watching.
+	nextUpCount int
 }
 
 // Model is the Bubble Tea model.
@@ -49,6 +51,7 @@ type itemsMsg struct {
 	parentID    string
 	items       []jellyfin.Item
 	resumeCount int
+	nextUpCount int
 }
 type errMsg struct{ err error }
 
@@ -65,9 +68,9 @@ func (m Model) Init() tea.Cmd {
 	return m.loadRoot()
 }
 
-// loadRoot loads the home page: "Continue Watching" (Resume) followed by the
-// libraries (Views). Both go into one list; resumeCount marks the boundary for
-// the visual split.
+// loadRoot loads the home page: "Continue Watching" (Resume), "Next Up", and
+// the libraries (Views). All three go into one list; resumeCount and
+// nextUpCount mark the boundaries for the visual split.
 func (m Model) loadRoot() tea.Cmd {
 	return func() tea.Msg {
 		views, err := m.backend.Views()
@@ -76,8 +79,16 @@ func (m Model) loadRoot() tea.Cmd {
 		}
 		// A Resume error is not fatal — it just means no "Continue Watching" list.
 		resume, _ := m.backend.Resume()
-		items := append(resume, views...)
-		return itemsMsg{title: "Home", parentID: "", items: items, resumeCount: len(resume)}
+		nextUp, _ := m.backend.NextUp()
+		items := append(resume, nextUp...)
+		items = append(items, views...)
+		return itemsMsg{
+			title:       "Home",
+			parentID:    "",
+			items:       items,
+			resumeCount: len(resume),
+			nextUpCount: len(nextUp),
+		}
 	}
 }
 
@@ -109,7 +120,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case itemsMsg:
 		m.err = nil
-		m.cur = level{title: msg.title, parentID: msg.parentID, items: msg.items, resumeCount: msg.resumeCount}
+		m.cur = level{
+			title:       msg.title,
+			parentID:    msg.parentID,
+			items:       msg.items,
+			resumeCount: msg.resumeCount,
+			nextUpCount: msg.nextUpCount,
+		}
 		return m, nil
 
 	case errMsg:
@@ -215,14 +232,16 @@ func (m Model) View() string {
 	}
 
 	for i, it := range m.cur.items {
-		// On the home page: section headers that split "Continue Watching" from
-		// the libraries.
-		if m.cur.resumeCount > 0 {
-			if i == 0 {
-				b.WriteString(sectionStyle.Render("Continue Watching") + "\n")
-			} else if i == m.cur.resumeCount {
-				b.WriteString("\n" + sectionStyle.Render("Libraries") + "\n")
-			}
+		// On the home page: section headers that split "Continue Watching",
+		// "Next Up", and the libraries.
+		if m.cur.resumeCount > 0 && i == 0 {
+			b.WriteString(sectionStyle.Render("Continue Watching") + "\n")
+		}
+		if m.cur.nextUpCount > 0 && i == m.cur.resumeCount {
+			b.WriteString("\n" + sectionStyle.Render("Next Up") + "\n")
+		}
+		if i == m.cur.resumeCount+m.cur.nextUpCount && i < len(m.cur.items) {
+			b.WriteString("\n" + sectionStyle.Render("Libraries") + "\n")
 		}
 
 		cursor := "  "

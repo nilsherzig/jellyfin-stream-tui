@@ -122,6 +122,27 @@ func TestResume_Success(t *testing.T) {
 	}
 }
 
+// Positive: NextUp calls the /Shows/NextUp endpoint and parses the items.
+func TestNextUp_Success(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/Shows/NextUp" {
+			t.Errorf("wrong path: %s", r.URL.Path)
+		}
+		json.NewEncoder(w).Encode(itemsResponse{Items: []Item{{ID: "y", Name: "Next Episode", Type: "Episode"}}})
+	}))
+	defer srv.Close()
+
+	c := New(srv.URL, "dev1")
+	c.userID = "u1"
+	items, err := c.NextUp()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 1 || items[0].Name != "Next Episode" {
+		t.Fatalf("wrong items: %+v", items)
+	}
+}
+
 // Positive: StreamURL contains the item ID and token.
 func TestStreamURL(t *testing.T) {
 	c := New("https://jf.example.com", "dev1")
